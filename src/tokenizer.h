@@ -2174,7 +2174,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
         if (c == '|')
         {
             c2 = script->nextChar();
-            if (c2 == '||')
+            if (c2 == '|')
             {
                 t = Token(TokenDoubleOr, EOF_VARTYPE);
                 // t._vartype = NULL;

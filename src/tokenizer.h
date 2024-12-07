@@ -155,16 +155,16 @@ varType _varTypes[] = {
     {
         ._varType = __int__,
         .varName = "",
-        ._varSize = 2,
-        .load = {l16si},
-        .store = {s16i},
+        ._varSize = 4,
+        .load = {l32i},
+        .store = {s32i},
         .membersNames = {},
         .starts = {},
         .memberSize = {},
         .types = {},
-        .sizes = {2},
+        .sizes = {4},
         .size = 1,
-        .total_size = 2,
+        .total_size = 4,
     },
     {
         ._varType = __float__,
@@ -384,7 +384,11 @@ enum tokenType
     TokenDoubleUppersand,
     TokenDoubleOr,
     TokenQuestionMark,
-    TokenColon
+    TokenColon,
+    TokenPlusEqual,
+    TokenMinusEqual,
+    TokenStarEqual,
+    TokenSlashEqual
 
 };
 
@@ -504,7 +508,11 @@ string tokenNames[] = {
     "TokenDoubleUppersand",
     "TokenDoubleOr",
     "TokenQuestionMark",
-    "TokenColon"
+    "TokenColon",
+    "TokenPlusEqual",
+    "TokenMinusEqual",
+    "TokenStarEqual",
+    "TokenSlashEqual"
 
 #endif
 };
@@ -624,6 +632,10 @@ const char *tokenFormat[] = {
     termColor.BWhite,   // TokenDoubleOr,
     termColor.BWhite,   // TokenQuestionMark,
     termColor.BWhite,   // TokenCOlon,
+    termColor.BWhite,   //TokenPlusEqual
+    termColor.BWhite,  //TokenMinusEqual
+    termColor.BWhite,   //TokenStarEqual
+    termColor.BWhite,  //TokenSlashEqual
 };
 
 /*
@@ -1065,6 +1077,19 @@ Token transNumber(string str)
     // t;
     // t.float_value=0;
     // t.int_value=0;
+                if(_tks.size()>1)
+            {
+                if(_tks.back().type==TokenSubstraction)
+                {
+                    tokenType subtype= (tokenType)_tks.getTokenAtPos(_tks.size()-2)->type;
+                if( subtype==TokenComma ||subtype==TokenEqual ||subtype==TokenDoubleEqual ||  subtype==TokenLessOrEqualThan  ||  subtype==TokenDoubleEqual||  subtype==TokenMoreThan  ||  subtype==TokenMoreOrEqualThan  ||  subtype==TokenNotEqual ||  subtype==TokenStarEqual  ||  subtype==TokenPlusEqual   || subtype==TokenOpenParenthesis)
+                {
+                        str="-"+str;
+                        _tks.pop_back();
+                }
+                }
+
+            }
     if (str.find(".") != string::npos)
     {
 
@@ -1075,7 +1100,7 @@ Token transNumber(string str)
     else
     {
 
-        Token t = Token(TokenNumber, (int)__uint32_t__);
+        Token t = Token(TokenNumber, (int)__int__);
         t.addText(str);
         return t;
     }
@@ -1246,7 +1271,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.line = _token_line;
                 t.pos = pos;
                 _tks.push(t);
-                nbReadToken++;
+               // nbReadToken++;
 
                 continue;
             }
@@ -1262,7 +1287,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 if (_for_display)
                     t.addText("=");
                 _tks.push(t);
-                nbReadToken++;
+               // nbReadToken++;
                 continue;
             }
         }
@@ -1281,7 +1306,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 // t.line = _token_line;
                 t.pos = pos;
                 _tks.push(t);
-                nbReadToken++;
+               // nbReadToken++;
                 continue;
             }
             else if (c2 == '<')
@@ -1331,7 +1356,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 //_tks.push(t);
                 _tks.push(t);
-                nbReadToken++;
+                //nbReadToken++;
                 continue;
             }
             else if (c2 == '>')
@@ -1362,7 +1387,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText(">");
                 // _tks.push(t);
                 _tks.push(t);
-                nbReadToken++;
+               // nbReadToken++;
                 continue;
             }
         }
@@ -1381,7 +1406,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 //_tks.push(t);
                 _tks.push(t);
-                nbReadToken++;
+               /// nbReadToken++;
                 continue;
             }
             else
@@ -1412,6 +1437,18 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t = Token(TokenPlusPlus, EOF_VARTYPE, _token_line);
                 if (_for_display)
                     t.addText("++");
+                // t.line = _token_line;
+                t.pos = pos;
+                // _tks.push(t);
+                // nbReadToken++;
+                _tks.push(t);
+                continue;
+            }
+            else if(c2=='=')
+            {
+                t = Token(TokenPlusEqual, EOF_VARTYPE, _token_line);
+                if (_for_display)
+                    t.addText("+=");
                 // t.line = _token_line;
                 t.pos = pos;
                 // _tks.push(t);
@@ -1592,7 +1629,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
             t.line = _token_line;
             t.pos = pos;
             //_tks.push(t);
-            _tks.push(t);
+
+            
+                _tks.push(t);
             nbReadToken++;
             pos = newpos - 1;
             continue;
@@ -1643,7 +1682,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.line = _token_line;
                 t.pos = pos;
                 _tks.push(t);
-                nbReadToken++;
+               // nbReadToken++;
 
                 continue;
             }
@@ -1692,7 +1731,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             t.pos = pos;
             //_tks.push(t);
             _tks.push(t);
-            nbReadToken++;
+           // nbReadToken++;
             continue;
         }
         if (c == '%')
@@ -1819,6 +1858,18 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 }
                 continue;
             }
+             else if(c2=='=')
+            {
+                t = Token(TokenSlashEqual, EOF_VARTYPE, _token_line);
+                if (_for_display)
+                    t.addText("/=");
+                // t.line = _token_line;
+                t.pos = pos;
+                // _tks.push(t);
+                // nbReadToken++;
+                _tks.push(t);
+                continue;
+            }
             else if (c2 == '*')
             {
                 // Token t;
@@ -1880,6 +1931,21 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 _tks.push(t);
                 continue;
             }
+            if (c2 == '=')
+            {
+                // token t;
+                // t._vartype = NULL;
+                // t.type = TokenPlusPlus;
+                t = Token(TokenMinusEqual, EOF_VARTYPE, _token_line);
+                if (_for_display)
+                    t.addText("-=");
+                // t.line = _token_line;
+                t.pos = pos;
+                // _tks.push(t);
+                // nbReadToken++;
+                _tks.push(t);
+                continue;
+            }
             else
             {
                 script->previousChar();
@@ -1893,7 +1959,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 // _tks.push(t);
                 _tks.push(t);
-                nbReadToken++;
+                //nbReadToken++;
                 continue;
             }
             // Token t;
@@ -2070,16 +2136,40 @@ int tokenizer(Script *script, bool update, bool increae_line,
         }
         if (c == '*')
         {
+             c2 = script->nextChar();
+            if (c2 == '=')
+            {
+                // token t;
+                // t._vartype = NULL;
+                // t.type = TokenPlusPlus;
+                t = Token(TokenStarEqual, EOF_VARTYPE, _token_line);
+                if (_for_display)
+                    t.addText("*=");
+                // t.line = _token_line;
+                t.pos = pos;
+                // _tks.push(t);
+                // nbReadToken++;
+                _tks.push(t);
+                continue;
+            }
+            else
+            {
+                script->previousChar();
+                // token t;
+                //  t._vartype = NULL;
+                // t.type = TokenAddition;
+                t = Token(TokenStar, EOF_VARTYPE, _token_line);
+                if (_for_display)
+                    t.addText("*");
+                // t.line = _token_line;
+                t.pos = pos;
+                // _tks.push(t);
+                _tks.push(t);
+                nbReadToken++;
+                continue;
+            }
             // Token t;
-            t._vartype = EOF_VARTYPE;
-            t.type = (int)TokenStar;
-            if (_for_display)
-                t.addText("*");
-            t.line = _token_line;
-            t.pos = pos;
-            _tks.push(t);
-            nbReadToken++;
-            continue;
+
         }
         if (c == '|')
         {
@@ -2124,7 +2214,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             t.line = _token_line;
             t.pos = pos;
             _tks.push(t);
-            nbReadToken++;
+           // nbReadToken++;
             continue;
         }
         // printf("Error invalid character |%c|\n", c);

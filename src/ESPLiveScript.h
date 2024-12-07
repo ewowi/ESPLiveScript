@@ -164,6 +164,8 @@ public:
     string linepos()
     {
         string f = string_format(" at line:%d position:%d", current()->line, current()->pos);
+        Error.line=current()->line;
+        Error.pos=current()->pos;
         return f;
     }
     int size()
@@ -247,7 +249,8 @@ public:
         parse();
         if (Error.error)
         {
-            pushToConsoleForce(string_format("%s\r\n", Error.error_message.c_str()).c_str());
+           // pushToConsole(Error.error_message.c_str(), true);
+            results.error=Error;
             return results;
         }
         pushToConsole("***********PARSING DONE*********\r\n");
@@ -289,6 +292,7 @@ public:
         pushToConsole("***********CREATE EXECUTABLE*********\r\n");
         executable _executecmd = createExectutable(&header, &content, __parser_debug);
         results.setExecutable(_executecmd);
+        results.error=_executecmd.error;
         content.clear();
         header.clear();
         change_type.clear();
@@ -299,7 +303,7 @@ public:
             // exeExist = false;
             // Serial.printf(termColor.Red);
 
-            pushToConsoleForce(string_format("%s\r\n", _executecmd.error.error_message.c_str()).c_str());
+           // pushToConsole(_executecmd.error.error_message.c_str(), true);
         }
 
 #endif
@@ -683,8 +687,20 @@ public:
         current_node = current_node->addChild(res);
         // current_node->copyChildren(search_result);
         current_node->addChild(search_result->getChildAtPos(0));
-        if (search_result->getChildAtPos(0)->_vartype == __float__ and change_type.size() > 0)
-            change_type.back()->_vartype = __float__;
+       // if (search_result->getChildAtPos(0)->_vartype == __float__ and change_type.size() > 0)
+         //   change_type.back()->_vartype = __float__;
+
+                       if (change_type.size() > 0)
+            {
+                if(change_type.back()->_vartype!=__float__)
+                {
+                    if (search_result->getChildAtPos(0)->_vartype == __float__ || search_result->getChildAtPos(0)->_vartype== __uint32_t__ )
+                    {
+                        change_type.back()->_vartype = search_result->getChildAtPos(0)->_vartype;
+                    }
+                }
+           
+            } 
         current_node->addChild(search_result->getChildAtPos(1));
 
         // sav_nb_arg = function._link->getChildAtPos(1)->children.size();
@@ -864,10 +880,13 @@ public:
                 nd._vartype = __none__;
                 if (lasttype != NULL)
                 {
+                    nd._vartype=lasttype->_vartype;
+                    /*
                     if (lasttype->_vartype == __float__)
                     {
                         nd._vartype = __float__;
                     }
+                    */
                 }
 
                 current_node = current_node->addChild(nd);
@@ -997,7 +1016,8 @@ public:
             {
                 return;
             }
-            current_node->addChild(NodeToken(current(), operatorNode));
+            current_node->type=current()->type;
+           // current_node->addChild(NodeToken(current(), operatorNode));
             next();
             current_node = current_node->parent;
             current_node = current_node->parent;
@@ -1021,9 +1041,12 @@ public:
         else if (Match(TokenIdentifier))
         {
             // NodeAssignement nd;
+           
             current_node = current_node->addChild(NodeToken(assignementNode));
             getVariable(true);
-
+            NodeToken d=NodeToken(current_node->getChildAtPos(0));
+           
+            nodeTokenList.push(d);
             _asPointer = false;
             isPointer = false;
             if (Error.error)
@@ -1038,18 +1061,23 @@ public:
                 // current_node=current_node->parent;
                 current_node = current_node->parent;
                 next();
+                nodeTokenList.pop();
                 return;
             }
             if (Match(TokenEqual))
             {
+                nodeTokenList.pop();
                 NodeToken nd;
                 nd._nodetype = changeTypeNode;
                 nd.type = TokenKeywordVarType;
                 nd.setTokenText("yves");
+                nd._vartype=tmp_sav->_vartype;
+                /*
                 if (tmp_sav->_vartype == __float__)
                     nd._vartype = __float__;
                 else
                     nd._vartype = __none__;
+                */
                 current_node = current_node->addChild(nd);
                 change_type.push_back(current_node);
                 next();
@@ -1077,6 +1105,76 @@ public:
                 next();
                 return;
             }
+            else if(Match(TokenPlusEqual) || Match(TokenMinusEqual) ||Match(TokenStarEqual) || Match(TokenSlashEqual))
+            {
+                sav_t.push_back(*current());
+                NodeToken nd;
+                nd._nodetype = changeTypeNode;
+                nd.type = TokenKeywordVarType;
+                nd.setTokenText("yves");
+                nd._vartype=tmp_sav->_vartype;
+                
+                current_node = current_node->addChild(nd);
+                change_type.push_back(current_node);
+                next();
+                current_node=current_node->addChild(NodeToken(binOpNode));
+                NodeToken *d=current_node->addChild(nodeTokenList.pop());
+               switch(d->_nodetype)
+               {
+                case storeExtGlocalVariableNode:
+                d->_nodetype=extGlobalVariableNode;
+                break;
+                case storeGlobalVariableNode:
+                d->_nodetype=globalVariableNode;
+                break;
+                case storeLocalVariableNode:
+                d->_nodetype=localVariableNode;
+                break;
+               }
+               Token t=sav_t.back();
+               switch (t.type)
+               {
+                case TokenPlusEqual:
+                t.type=TokenAddition;
+                break;
+                case TokenMinusEqual:
+                t.type=TokenSubstraction;
+                break;
+                case TokenStarEqual:
+                t.type=TokenStar;
+                break;
+                case TokenSlashEqual:
+                t.type=TokenSlash;
+                break;
+               }
+                //current_node->addChild(NodeToken(&t,operatorNode));
+                current_node->type=t.type;
+              sav_t.pop_back();
+
+                parseExprAddMinus();
+                if(Error.error)
+                {
+                    return;
+                }
+                if (Match(TokenSemicolon))
+            {
+                Error.error = 0;
+                // result._nd = nd;
+                 current_node=current_node->parent;
+                  current_node=current_node->parent;
+                current_node = current_node->parent;
+                next();
+               // nodeTokenList.pop();
+                return;
+            }
+                else
+                {
+                    Error.error = 1;
+                Error.error_message = string_format("Expected ; %s", linepos().c_str());
+                return;
+                }
+            }
+   
             else
             {
                 Error.error = 1;
@@ -1440,10 +1538,13 @@ public:
                 nd._nodetype = changeTypeNode;
                 nd.type = TokenKeywordVarType;
                 nd.setTokenText("yevbs");
+                 nd._vartype = tmp_sav->_vartype;
+                /*
                 if (tmp_sav->_vartype == __float__)
                     nd._vartype = __float__;
                 else
                     nd._vartype = __none__;
+                    */
                 current_node = current_node->addChild(nd);
                 change_type.push_back(current_node);
                 parseExpr();
@@ -1474,7 +1575,7 @@ public:
                 next();
                 return;
             }
-   
+
             else
             {
                 Error.error = 1;
@@ -1845,7 +1946,12 @@ public:
 if(Match(TokenQuestionMark))
         {
             next();
+                        _node_token_stack.push_back(current_node->children.back());
+            // NodeToken d = current_node->children.back();
+            current_node->children.pop_back();
             current_node=current_node->addChild(NodeToken(ternaryIfNode));
+                        current_node->addChild(_node_token_stack.back());
+            _node_token_stack.pop_back();
             current_node->addTargetText(string_format("label_tern_%d",for_if_num));
             for_if_num++;
             parseExprAddMinus();
@@ -1878,7 +1984,8 @@ if(Match(TokenQuestionMark))
             _node_token_stack.pop_back();
             // current_node->parent->children.remove(current_node->parent->children.back());
             // NodeOperator opt = NodeOperator(op);
-            current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            //current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            current_node->type=sav_t.back().type;
             sav_t.pop_back();
             parseFactor();
             if (Error.error == 1)
@@ -1944,8 +2051,8 @@ if(Match(TokenQuestionMark))
                 (&sav_t.back())->type =TokenKeywordAnd;
             else
              (&sav_t.back())->type =TokenKeywordOr;
-            current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
-
+           // current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            current_node->type=sav_t.back().type;
             sav_t.pop_back();
             parseExprConditionnal();
             if (Error.error == 1)
@@ -1996,11 +2103,16 @@ if(Match(TokenQuestionMark))
             nd._nodetype = changeTypeNode;
             nd.type = TokenKeywordVarType;
             nd._vartype = findfloat(_node_token_stack.back());
+            if(nd._vartype!=__float__)
+            {
+                nd._vartype = finduint32_t(_node_token_stack.back());
+            }
             current_node = current_node->addChild(nd);
             change_type.push_back(current_node);
             current_node->addChild(_node_token_stack.back());
             _node_token_stack.pop_back();
             current_node = current_node->parent;
+            nd._vartype=__none__;
             current_node = current_node->addChild(nd);
             // current_node->type=sav_t.back().type;
             change_type.push_back(current_node);
@@ -2025,7 +2137,7 @@ if(Match(TokenQuestionMark))
     {
 
         sav_token.push_back(current_node);
-        ;
+        
         parseTerm();
         if (Error.error == 1)
         {
@@ -2043,7 +2155,8 @@ if(Match(TokenQuestionMark))
             current_node = current_node->addChild(NodeToken(binOpNode));
             current_node->addChild(_node_token_stack.back());
             _node_token_stack.pop_back();
-            current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            //current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            current_node->type=sav_t.back().type;
             sav_t.pop_back();
             parseTerm();
             if (Error.error == 1)
@@ -2093,8 +2206,17 @@ if(Match(TokenQuestionMark))
             current_node->addChild(NodeToken(current(), numberNode));
             if (change_type.size() > 0)
             {
+                if(change_type.back()->_vartype!=__float__)
+                {
+                    if (current()->_vartype == __float__ || current()->_vartype == __uint32_t__ )
+                    {
+                        change_type.back()->_vartype = current()->_vartype;
+                    }
+                }
+                /*
                 if (current()->_vartype == __float__)
                     change_type.back()->_vartype = current()->_vartype;
+                    */
             }
             next();
 
@@ -2120,7 +2242,8 @@ if(Match(TokenQuestionMark))
                 return;
             }
             // NodeUnitary g = NodeUnitary(NodeOperator(t), res._nd);
-            current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+           // current_node->addChild(NodeToken(&sav_t.back(), operatorNode));
+            current_node->type=sav_t.back().type;
             sav_t.pop_back();
             current_node = current_node->parent;
             Error.error = 0;
@@ -2145,10 +2268,13 @@ if(Match(TokenQuestionMark))
             NodeToken nd;
             nd._nodetype = changeTypeNode;
             nd.type = TokenKeywordVarType;
+            nd._vartype=current_node->_vartype;
+            /*
             if (current_node->_vartype == __float__)
                 nd._vartype = __float__;
             else
                 nd._vartype = __none__;
+                */
             current_node = current_node->addChild(nd);
             change_type.push_back(current_node);
 
@@ -2215,8 +2341,17 @@ if(Match(TokenQuestionMark))
             // change_type.back()->_vartype=__float__;
             if (change_type.size() > 0)
             {
+                if(change_type.back()->_vartype!=__float__)
+                {
+                    if (tmp_sav->_vartype == __float__ || tmp_sav->_vartype == __uint32_t__ )
+                    {
+                        change_type.back()->_vartype = tmp_sav->_vartype;
+                    }
+                }
+                /*
                 if (tmp_sav->_vartype == __float__)
                     change_type.back()->_vartype = __float__;
+                    */
             }
             if (Error.error == 1)
             {
@@ -2407,7 +2542,7 @@ if(Match(TokenQuestionMark))
             {
                 j++;
                 // Token num = *current();
-                if (current()->getVarType()->_varType == __uint32_t__)
+                if (current()->getVarType()->_varType == __int__)
                 {
                     var._total_size *= stringToInt(current()->getText());
                     sizestr = sizestr + " " + string(current()->getText());
@@ -2424,7 +2559,7 @@ if(Match(TokenQuestionMark))
                 while (Match(TokenComma))
                 {
                     next();
-                    if (current()->getVarType()->_varType == __uint32_t__)
+                    if (current()->getVarType()->_varType == __int__)
                     {
                         j++;
                         var._total_size *= stringToInt(current()->getText());
@@ -2928,6 +3063,10 @@ void compile_c(Console *cons, vector<string> args)
         scriptRuntime.addExe(_scExec);
         pushToConsoleForce("Compiling done. Handle number:%d\r\n", scExecutables.size());
     }
+    else
+    {
+        pushToConsole(_scExec.error.error_message);
+    }
 }
 void free(Console *cons, vector<string> args)
 {
@@ -2990,7 +3129,10 @@ void parse_c(Console *cons, vector<string> args)
             pushToConsoleForce("Execution done.\r\n");
         }
     }
-
+    else
+    {
+         LedOS.pushToConsole(SCExecutable.error.error_message, true);
+    }
     __parser_debug = false;
 }
 

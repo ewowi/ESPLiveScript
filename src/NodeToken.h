@@ -411,7 +411,7 @@ public:
                         delta = nd.getVarType()->_varSize - stack_size % 4 + 1;
                 }
             }
-            else if (nd.getVarType()->_varType == __uint16_t__ )
+            else if (nd.getVarType()->_varType == __uint16_t__  ||nd.getVarType()->_varType == __s_int__ )
             {
                 if (stack_size % 2 != 0)
                 {
@@ -1045,6 +1045,10 @@ varTypeEnum findfloat(NodeToken *nd)
     if (nd->_vartype == __float__)
     {
         return __float__;
+    }
+    else if(nd->_nodetype==globalVariableNode)
+    {
+        return __none__;
     }
     else
     {
@@ -1892,30 +1896,37 @@ void _visitglobalVariableNode(NodeToken *nd)
         }
         if (nb > 1)
         {
-            content.addAfter("movi a11,1");
+           content.addAfter("movi a10,0");
         }
+
         for (int i = 0; i < nd->children.size(); i++)
         {
-            globalType.push(__int__);
+          //  globalType.push(__int__);
             register_numl.duplicate();
             nd->getChildAtPos(i)->visitNode();
             register_numl.pop();
-            if (nb > 1)
+            translateType(__int__, nd->getChildAtPos(i)->getVarType()->_varType, register_numl.get());
+            if (nd->children.size() > 1)
             {
                 if (i < nd->children.size() - 1)
                 {
 
-                    content.addAfter(string_format("movi a10,%d", stringToInt((char *)tile[i + 2].c_str())));
-                    content.addAfter(string_format("mull a11,a10,a11"));
-                    content.addAfter(string_format("mull a11,a%d,a11", register_numl.get()));
+                    for(int h=1;h<nd->children.size()-i;h++)    
+                    {
+                    content.addAfter(string_format("movi a11,%d", stringToInt((char *)tile[i + 1+h].c_str())));
+                   // content.addAfter(string_format("mull a11,a10,a11"));
+                    content.addAfter(string_format("mull a%d,a%d,a11",register_numl.get(), register_numl.get()));
+                    }
+                    //if(i>0)
+                    content.addAfter(string_format("add a10,a10,a%d", register_numl.get()));
                 }
                 else
                 {
-                    content.addAfter(string_format("add a%d,a11,a%d", register_numl.get(), register_numl.get()));
+                    content.addAfter(string_format("add a%d,a10,a%d", register_numl.get(), register_numl.get()));
                 }
             }
 
-            globalType.pop();
+           // globalType.pop();
         }
     }
     varType *v = nd->getVarType();
@@ -3261,6 +3272,7 @@ void _visitextGlobalVariableNode(NodeToken *nd)
         register_numl.duplicate();
         nd->getChildAtPos(0)->visitNode();
         register_numl.pop();
+
     }
     varType *v = nd->getVarType();
     int start = nd->stack_pos;
@@ -3281,6 +3293,72 @@ void _visitextGlobalVariableNode(NodeToken *nd)
     {
         if (nd->children.size() > 0)
         {
+            
+if (nd->children.size() > 1)
+    {
+        /*
+        for (int par = 0; par < nd->children.size(); par++)
+        {
+            register_numl.duplicate();
+            nd->getChildAtPos(par)->visitNode();
+            register_numl.pop();
+            content.addAfter(string_format("mov a%d,a%d", 10 + par, register_numl.get()));
+        }
+        content.addAfter(string_format("callExt a%d,map%dD", register_numl.get(), nd->children.size()));
+        content.addAfter(string_format("mov a%d,a10", register_numl.get()));
+    */
+   vector<string> tile;
+        int nb = 0;
+        string sd = string(nd->getTargetText());
+        if (sd.compare(0, 1, "@") == 0)
+        {
+            tile = split(sd, " ");
+
+            sscanf(tile[0].c_str(), "@%d", &nb);
+        }
+        if (nb > 1 and sd.compare(0, 1, "@") == 0)
+        {
+            content.addAfter("movi a10,0");
+        }
+        for (int par = 0; par < nd->children.size(); par++)
+        {
+           // globalType.push(__int__);
+            if(par>0)
+            {
+            register_numl.duplicate();
+            nd->getChildAtPos(par)->visitNode();
+            register_numl.pop();
+            }
+            if (nd->getChildAtPos(par)->getVarType() != NULL)
+        {
+            translateType(__int__, nd->getChildAtPos(par)->getVarType()->_varType, register_numl.get());
+        }
+            if (nb > 1)
+            {
+                if (par< nd->children.size() - 1)
+                {
+
+                    for(int h=1;h<nd->children.size()-par;h++)    
+                    {
+                    content.addAfter(string_format("movi a11,%d", stringToInt((char *)tile[par + 1+h].c_str())));
+                   // content.addAfter(string_format("mull a11,a10,a11"));
+                    content.addAfter(string_format("mull a%d,a%d,a11",register_numl.get(), register_numl.get()));
+                    }
+                    content.addAfter(string_format("add a10,a10,a%d", register_numl.get()));
+                }
+                else
+                {
+                    content.addAfter(string_format("add a%d,a10,a%d", register_numl.get(), register_numl.get()));
+                }
+            }
+
+           // globalType.pop();
+        }
+    }
+    else{
+         translateType(__int__, nd->getChildAtPos(0)->getVarType()->_varType, register_numl.get());
+    }
+
             content.addAfter(string_format("movExt a%d,%s", point_regnum, nd->getTokenText()));
             // f=f+number.f;
             for (int i = 0; i < v->total_size; i++)
@@ -3347,7 +3425,10 @@ void _visitextCallFunctionNode(NodeToken *nd)
         }
         else
         {
-            content.addAfter(string_format("mov a%d,a10", register_numl.get()));
+            if(v->_varType !=__void__)
+            {
+                content.addAfter(string_format("mov a%d,a10", register_numl.get()));
+            }
             content.sp.push(content.get());
         }
     }
@@ -3688,7 +3769,7 @@ void _visitstoreGlobalVariableNode(NodeToken *nd)
         }
         if (nb > 1 and sd.compare(0, 1, "@") == 0)
         {
-            content.addAfter("movi a11,1");
+            content.addAfter("movi a10,0");
         }
         for (int i = 0; i < nd->children.size(); i++)
         {
@@ -3696,18 +3777,23 @@ void _visitstoreGlobalVariableNode(NodeToken *nd)
             register_numl.duplicate();
             nd->getChildAtPos(i)->visitNode();
             register_numl.pop();
+            translateType(__int__, nd->getChildAtPos(i)->getVarType()->_varType, register_numl.get());
             if (nb > 1)
             {
                 if (i < nd->children.size() - 1)
                 {
 
-                    content.addAfter(string_format("movi a10,%d", stringToInt((char *)tile[i + 2].c_str())));
-                    content.addAfter(string_format("mull a11,a10,a11"));
-                    content.addAfter(string_format("mull a11,a%d,a11", register_numl.get()));
+                    for(int h=1;h<nd->children.size()-i;h++)    
+                    {
+                    content.addAfter(string_format("movi a11,%d", stringToInt((char *)tile[i + 1+h].c_str())));
+                   // content.addAfter(string_format("mull a11,a10,a11"));
+                    content.addAfter(string_format("mull a%d,a%d,a11",register_numl.get(), register_numl.get()));
+                    }
+                    content.addAfter(string_format("add a10,a10,a%d", register_numl.get()));
                 }
                 else
                 {
-                    content.addAfter(string_format("add a%d,a11,a%d", register_numl.get(), register_numl.get()));
+                    content.addAfter(string_format("add a%d,a10,a%d", register_numl.get(), register_numl.get()));
                 }
             }
 
@@ -3837,6 +3923,7 @@ void _visitstoreExtGlocalVariableNode(NodeToken *nd)
     }
     else if (nd->children.size() > 1)
     {
+        /*
         for (int par = 0; par < nd->children.size(); par++)
         {
             register_numl.duplicate();
@@ -3846,6 +3933,48 @@ void _visitstoreExtGlocalVariableNode(NodeToken *nd)
         }
         content.addAfter(string_format("callExt a%d,map%dD", register_numl.get(), nd->children.size()));
         content.addAfter(string_format("mov a%d,a10", register_numl.get()));
+    */
+   vector<string> tile;
+        int nb = 0;
+        string sd = string(nd->getTargetText());
+        if (sd.compare(0, 1, "@") == 0)
+        {
+            tile = split(sd, " ");
+
+            sscanf(tile[0].c_str(), "@%d", &nb);
+        }
+        if (nb > 1 and sd.compare(0, 1, "@") == 0)
+        {
+            content.addAfter("movi a10,0");
+        }
+        for (int par = 0; par < nd->children.size(); par++)
+        {
+           // globalType.push(__int__);
+            register_numl.duplicate();
+            nd->getChildAtPos(par)->visitNode();
+            register_numl.pop();
+            translateType(__int__, nd->getChildAtPos(par)->getVarType()->_varType, register_numl.get());
+            if (nb > 1)
+            {
+                if (par< nd->children.size() - 1)
+                {
+
+                    for(int h=1;h<nd->children.size()-par;h++)    
+                    {
+                    content.addAfter(string_format("movi a11,%d", stringToInt((char *)tile[par + 1+h].c_str())));
+                   // content.addAfter(string_format("mull a11,a10,a11"));
+                    content.addAfter(string_format("mull a%d,a%d,a11",register_numl.get(), register_numl.get()));
+                    }
+                    content.addAfter(string_format("add a10,a10,a%d", register_numl.get()));
+                }
+                else
+                {
+                    content.addAfter(string_format("add a%d,a10,a%d", register_numl.get(), register_numl.get()));
+                }
+            }
+
+           // globalType.pop();
+        }
     }
 
     if (safeMode && nd->isPointer)

@@ -39,6 +39,7 @@ enum varTypeEnum
     __uint16_t__,
     __uint32_t__,
     __int__,
+    __s_int__,
     __float__,
     __void__,
     __CRGB__,
@@ -83,6 +84,7 @@ string varTypeEnumNames[] = {
     "__unit16_t__",
     "__unit32_t__",
     "__int__",
+    "__s_int__",
     "__float__",
     "__void__",
     "__CRGB__",
@@ -165,6 +167,20 @@ varType _varTypes[] = {
         .sizes = {4},
         .size = 1,
         .total_size = 4,
+    },
+        {
+        ._varType = __s_int__,
+        .varName = "",
+        ._varSize = 2,
+        .load = {l16si},
+        .store = {s16i},
+        .membersNames = {},
+        .starts = {},
+        .memberSize = {},
+        .types = {},
+        .sizes = {2},
+        .size = 1,
+        .total_size = 2,
     },
     {
         ._varType = __float__,
@@ -279,6 +295,7 @@ string keywordTypeNames[] = {
     "KeywordVarType",
     "KeywordVarType",
     "KeywordVarType",
+    "KeywordVarType",
     "KeywordExternalVar",
     "KeywordFor",
     "KeywordIf",
@@ -297,15 +314,15 @@ string keywordTypeNames[] = {
 
 };
 
-#define nb_keywords 35
-#define nb_typeVariables 12
+#define nb_keywords 36
+#define nb_typeVariables 13
 string keyword_array[nb_keywords] =
-    {"none", "uint8_t", "uint16_t", "uint32_t", "int", "float", "void", "CRGB",
+    {"none", "uint8_t", "uint16_t", "uint32_t", "int","s_int" ,"float", "void", "CRGB",
      "CRGBW", "char", "Args","bool","external", "for", "if", "then", "else", "while", "return",
      "import", "from", "__ASM__",
      "define", "safe_mode", "_header_", "_content_", "and", "or", "continue",
      "break", "fabs", "abs", "save_reg",
-     "save_reg_abs", "struct"};
+     "save_reg_abs", "Object"};
 
 bool __isBlockComment = false;
 enum tokenType
@@ -393,6 +410,7 @@ enum tokenType
 };
 
 tokenType __keywordTypes[] = {
+    TokenKeywordVarType,
     TokenKeywordVarType,
     TokenKeywordVarType,
     TokenKeywordVarType,
@@ -1682,7 +1700,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.line = _token_line;
                 t.pos = pos;
                 _tks.push(t);
-               // nbReadToken++;
+               //nbReadToken++;
 
                 continue;
             }
@@ -1814,14 +1832,36 @@ int tokenizer(Script *script, bool update, bool increae_line,
             // token t;
             // t.type = TokenCloseBracket;
             // t._vartype = NULL;
-            t = Token(TokenCloseBracket, EOF_VARTYPE, _token_line);
-            if (_for_display)
-                t.addText("]");
-            t.line = _token_line;
-            t.pos = pos;
-            _tks.push(t);
-            nbReadToken++;
-            continue;
+          c2 = script->nextChar();
+            if (c2 == '[')
+            {
+                t = Token(TokenComma, EOF_VARTYPE);
+                // t._vartype = NULL;
+                // t.type = TokenDoubleEqual;
+                if (_for_display)
+                    t.addText("][");
+                t.line = _token_line;
+                t.pos = pos;
+                _tks.push(t);
+                nbReadToken++;
+
+                continue;
+            }
+            else
+            {
+                script->previousChar();
+                // token t;
+                //  t._vartype = NULL;
+                //  t.type = TokenEqual;
+                //  t.line = _token_line;
+                t = Token(TokenCloseBracket, EOF_VARTYPE, _token_line);
+                t.pos = pos;
+                if (_for_display)
+                    t.addText("]");
+                _tks.push(t);
+                nbReadToken++;
+                continue;
+            }
         }
         if (c == '/')
         {

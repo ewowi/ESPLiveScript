@@ -1268,12 +1268,7 @@ error_message_struct parseASM(Text *_footer,Text *_header, Text *_content, parse
     _data_size=(_size / 4) * 4 + 4;
   }
   // printf("her:\r\n");
-#ifdef __CONSOLE_ESP32
-  string d = string_format("Parsing %d assembly lines ... ", _header->size() + _content->size()+_footer->size());
-  LedOS.pushToConsole(d);
-#else
-  printf("Parsing %d assembly lines ...\r\n ", _header->size() + _content->size()+_footer->size());
-#endif
+  pushToConsole("Parsing %d assembly lines ...\r\n ", _header->size() + _content->size()+_footer->size());
 
   int size = _header->size();
   int tmp_size = size;

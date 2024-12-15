@@ -1844,6 +1844,8 @@ error_message_struct executeBinary(string function, executable ex, uint32_t hand
 
       executeBinaryAsm(&ex.functions[i].address, &ex.links);
 
+      pushToConsole(string_format("address of function %s :%d\n",ex.functions[i].name.c_str(), ex.functions[i].address).c_str());
+
       // printf("address of function %s :%x\n",ex.functions[i].name.c_str(), toexecute);
       //  executeBinaryAsm(&toexecute, &ex.links);
 

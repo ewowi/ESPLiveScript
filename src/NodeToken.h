@@ -9,6 +9,7 @@ using namespace std;
 #include "string_function.h"
 
 #include "tokenizer.h"
+#include "asm_external.h"
 
 #define _START_2 32
 #define _STACK_SIZE (_START_2 + 6 * 4)
@@ -19,6 +20,7 @@ uint32_t __startStackMemory;
 uint32_t __MaxStackMemory;
 uint32_t __endtime;
 uint32_t __starttime;
+int savestacksize=0;
 bool oneFunction = false;
 
 int stack_size = 0;
@@ -33,6 +35,7 @@ int local_var_num = 0;
 
 int __sav_arg = 0;
 bool _asPointer = false;
+bool found;
 string struct_name = "";
 list<int> nb_args;
 vector<string> sigs;
@@ -55,6 +58,7 @@ bool isExternal = false;
 
 bool isPointer = true;
 bool isStructFunction = false;
+bool sav_b=false;
 bool isASM = false;
 bool safeMode = false;
 bool saveReg = false;
@@ -877,6 +881,7 @@ public:
 };
 
 Script main_script;
+Script extra_script;
 NodeToken program = NodeToken(programNode);
 NodeToken *current_node;
 NodeToken *search_result;
@@ -986,13 +991,9 @@ public:
             }
          }
             
-
-        /*
-        if (parent != NULL)
-        {
-            return parent->findFunction(t);
-        }
-       */
+        //looking in the external
+       
+  
         search_result = NULL;
         return;
     }
@@ -1037,6 +1038,7 @@ public:
                 c_cntx = c_cntx->parent;
             }
         }
+
         search_result = NULL;
         return;
     }

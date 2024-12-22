@@ -496,6 +496,8 @@ typedef struct
 {
   externalType type;
   string name;
+  string signature;
+  string shortname;
   void *ptr;
   int offset;
 } asm_external;

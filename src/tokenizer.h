@@ -50,6 +50,7 @@ enum varTypeEnum
     __userDefined__,
     __unknown__
 };
+bool insecond=false;
 
 struct varType
 {
@@ -314,7 +315,7 @@ string keywordTypeNames[] = {
 
 };
 
-#define nb_keywords 36
+#define nb_keywords 37
 #define nb_typeVariables 13
 string keyword_array[nb_keywords] =
     {"none", "uint8_t", "uint16_t", "uint32_t", "int", "s_int", "float", "void", "CRGB",
@@ -322,7 +323,7 @@ string keyword_array[nb_keywords] =
      "import", "from", "__ASM__",
      "define", "safe_mode", "_header_", "_content_", "and", "or", "continue",
      "break", "fabs", "abs", "save_reg",
-     "save_reg_abs", "struct"};
+     "save_reg_abs", "struct","override"};
 
 bool __isBlockComment = false;
 enum tokenType
@@ -405,7 +406,8 @@ enum tokenType
     TokenPlusEqual,
     TokenMinusEqual,
     TokenStarEqual,
-    TokenSlashEqual
+    TokenSlashEqual,
+    TokenOverride
 
 };
 
@@ -446,6 +448,7 @@ tokenType __keywordTypes[] = {
     TokenKeywordSaveReg,
     TokenKeywordSaveRegAbs,
     TokenKeywordStruct,
+    TokenOverride
 
 };
 
@@ -529,7 +532,8 @@ string tokenNames[] = {
     "TokenPlusEqual",
     "TokenMinusEqual",
     "TokenStarEqual",
-    "TokenSlashEqual"
+    "TokenSlashEqual",
+    "TokenOverride"
 
 #endif
 };
@@ -653,6 +657,7 @@ const char *tokenFormat[] = {
     termColor.BWhite,   // TokenMinusEqual
     termColor.BWhite,   // TokenStarEqual
     termColor.BWhite,   // TokenSlashEqual
+    termColor.LMagenta,   // TokenSlashEqual
 };
 
 /*
@@ -769,7 +774,7 @@ public:
     char previousChar()
     {
 
-        if ((position - 1) >= 0)
+        if ((position-1) >= 0)
         {
             position--;
             return (*it)[position];
@@ -790,8 +795,10 @@ public:
             }
             else
             {
-                position = 0;
-                return (*it)[0];
+                printf("jkjk\n");
+                position = -1;
+               
+                return 0;// (*it)[0];
             }
         }
     }
@@ -941,11 +948,20 @@ public:
     {
         return _tokens.size();
     }
-    void tokenize(Script *script, bool update, bool increae_line, int nbToken)
+        void tokenizelow(Script *script, bool update, bool increae_line, int nbToken)
     {
         _script = script;
         clear();
         tokenizer(script, true, increae_line, nbToken);
+        // list_of_token.push_back(token());
+        // Serial.printf("token read %d\n", tokenizer(script, true, increae_line, nbToken));
+    }
+    void tokenize(Script *script, bool update, bool increae_line, int nbToken)
+    {
+        _script = script;
+        clear();
+        
+        tokenizer(script, update, increae_line, nbToken);
         // list_of_token.push_back(token());
         // Serial.printf("token read %d\n", tokenizer(script, true, increae_line, nbToken));
     }
@@ -994,6 +1010,7 @@ public:
 
         return getTokenAtPos(position);
 #else
+
         _tokens.erase(_tokens.begin());
         _tokens.shrink_to_fit();
 
@@ -1083,7 +1100,10 @@ private:
 #endif
 };
 
-Tokens _tks = Tokens();
+Tokens __tks = Tokens();
+Tokens _extra_tks = Tokens();
+Tokens *_tks;
+
 void displaytoken(token t)
 {
     // printf("%s\t%d\t%f\t%s%d %d\t%s\n", tokenNames[t.type].c_str(), t.int_value, t.float_value, t.text.c_str(), t.line, //t.pos, keywordTypeNames[t._keyword].c_str());
@@ -1094,15 +1114,15 @@ Token transNumber(string str)
     // t;
     // t.float_value=0;
     // t.int_value=0;
-    if (_tks.size() > 1)
+    if (_tks->size() > 1)
     {
-        if (_tks.back().type == TokenSubstraction)
+        if (_tks->back().type == TokenSubstraction)
         {
-            tokenType subtype = (tokenType)_tks.getTokenAtPos(_tks.size() - 2)->type;
+            tokenType subtype = (tokenType)_tks->getTokenAtPos(_tks->size() - 2)->type;
             if (subtype == TokenComma || subtype == TokenEqual || subtype == TokenDoubleEqual || subtype == TokenLessOrEqualThan || subtype == TokenDoubleEqual || subtype == TokenMoreThan || subtype == TokenMoreOrEqualThan || subtype == TokenNotEqual || subtype == TokenStarEqual || subtype == TokenPlusEqual || subtype == TokenOpenParenthesis)
             {
                 str = "-" + str;
-                _tks.pop_back();
+                _tks->pop_back();
             }
         }
     }
@@ -1246,21 +1266,26 @@ int tokenizer(Script *script, bool update, bool increae_line,
     v.clear();
     if (update)
     {
-        userDefinedVarTypeNames.clear();
-        userDefinedVarTypeNames.shrink_to_fit();
-        all_text.clear();
-        _tks.clear();
+        _tks->clear();
         for (int i = 0; i < __DEPTH; i++)
         {
-            _tks.push(Token());
+            _tks->push(Token());
         }
         _token_line = 1;
         pos = 0;
+         if(!insecond)
+         {
+        userDefinedVarTypeNames.clear();
+        userDefinedVarTypeNames.shrink_to_fit();
+        //all_text.clear();
+
         deleteDefine();
 
         __isBlockComment = false;
-        // _for_display= true;
+         }
     }
+        // _for_display= true;
+    
     else
     {
         script->previousChar();
@@ -1268,7 +1293,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
     int nbReadToken = 0;
     while (script->nextChar() != EOF_TEXT and nbReadToken < nbMaxTokenToRead)
     {
-        // printf(" nb read :%c:\n",script->currentChar());
+       //  printf(" nb read :%c:\n",script->currentChar());
         t.clean();
         v.clear();
         pos++;
@@ -1287,7 +1312,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("==");
                 t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 // nbReadToken++;
 
                 continue;
@@ -1303,7 +1328,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("=");
-                _tks.push(t);
+                _tks->push(t);
                 // nbReadToken++;
                 continue;
             }
@@ -1322,7 +1347,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("<=");
                 // t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 // nbReadToken++;
                 continue;
             }
@@ -1336,8 +1361,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("<<");
                 // t.line = _token_line;
                 //  t.pos = pos;
-                //  _tks.push(t);
-                _tks.push(t);
+                //  _tks->push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1353,7 +1378,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("<");
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1371,8 +1396,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText(">=");
                 // t.line = _token_line;
                 t.pos = pos;
-                //_tks.push(t);
-                _tks.push(t);
+                //_tks->push(t);
+                _tks->push(t);
                 // nbReadToken++;
                 continue;
             }
@@ -1386,8 +1411,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText(">>");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1402,8 +1427,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText(">");
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 // nbReadToken++;
                 continue;
             }
@@ -1421,8 +1446,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("!=");
                 // t.line = _token_line;
                 t.pos = pos;
-                //_tks.push(t);
-                _tks.push(t);
+                //_tks->push(t);
+                _tks->push(t);
                 /// nbReadToken++;
                 continue;
             }
@@ -1437,8 +1462,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("!");
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1456,9 +1481,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("++");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             else if (c2 == '=')
@@ -1468,9 +1493,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("+=");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             else
@@ -1484,8 +1509,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("+");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1517,6 +1542,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 if (t.getType() == TokenKeywordExternalVar)
                 {
                     t.type = (int)TokenExternal;
+                  //  printf("ereeeeeeee\n");
                 }
                 if ((t.getType() == TokenKeywordImport or t.getType() == TokenKeywordDefine) && !_for_display)
                 {
@@ -1533,10 +1559,10 @@ int tokenizer(Script *script, bool update, bool increae_line,
             {
                 t.type = (int)TokenIdentifier;
 
-                if (_tks.size() >= __DEPTH)
+                if (_tks->size() >= __DEPTH)
                 {
 
-                    Token prev = _tks.back();
+                    Token prev = _tks->back();
                     if (prev.getType() == TokenKeywordImport && !_for_display)
                     {
 
@@ -1547,7 +1573,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                         if (findLibFunction(v) > -1)
                         {
 
-                            _tks.pop_back();
+                            _tks->pop_back();
 
                             all_text.pop();
 
@@ -1566,8 +1592,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                         if (findLibFunction(v) > -1)
                         {
 
-                            _tks.pop_back();
-                            // printf("token %d\n",_tks.back().type);
+                            _tks->pop_back();
+                            // printf("token %d\n",_tks->back().type);
                             all_text.pop();
 
                             // list_of_token.pop_back();
@@ -1581,7 +1607,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     }
                     else if (prev.getType() == TokenKeywordDefine && !_for_display)
                     {
-                        _tks.pop_back();
+                        _tks->pop_back();
                         all_text.pop();
                         // nbReadToken--;
 
@@ -1623,8 +1649,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
             pos = newpos - 1;
 
             t.addText(v);
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1645,9 +1671,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //  t._vartype=NULL;
             t.line = _token_line;
             t.pos = pos;
-            //_tks.push(t);
+            //_tks->push(t);
 
-            _tks.push(t);
+            _tks->push(t);
             nbReadToken++;
             pos = newpos - 1;
             continue;
@@ -1662,8 +1688,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText(";");
             // t.line = _token_line;
             t.pos = pos;
-            // _tks.push(t);
-            _tks.push(t);
+            // _tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1679,9 +1705,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //  t.pos = pos;
             if (_for_display)
             {
-                //_tks.push(t);
+                //_tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
             }
             continue;
         }
@@ -1697,7 +1723,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("&&");
                 t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 // nbReadToken++;
 
                 continue;
@@ -1713,7 +1739,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("&");
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1727,11 +1753,11 @@ int tokenizer(Script *script, bool update, bool increae_line,
             if (_for_display)
             {
                 t.addText("#");
-                // _tks.push(t);
+                // _tks->push(t);
             }
             // t.line = _token_line;
             //  t.pos = pos;
-            _tks.push(t);
+            _tks->push(t);
             // nbReadToken++;
             continue;
         }
@@ -1745,8 +1771,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("(");
             // t.line = _token_line;
             t.pos = pos;
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             // nbReadToken++;
             continue;
         }
@@ -1760,8 +1786,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("%");
             // t.line = _token_line;
             t.pos = pos;
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1775,8 +1801,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText(")");
             // t.line = _token_line;
             t.pos = pos;
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1790,8 +1816,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("{");
             // t.line = _token_line;
             //  t.pos = pos;
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1805,8 +1831,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("}");
             // t.line = _token_line;
             t.pos = pos;
-            // _tks.push(t);
-            _tks.push(t);
+            // _tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1820,8 +1846,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("[");
             // t.line = _token_line;
             t.pos = pos;
-            //_tks.push(t);
-            _tks.push(t);
+            //_tks->push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -1840,7 +1866,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("][");
                 t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
 
                 continue;
@@ -1856,7 +1882,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("]");
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1891,7 +1917,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 if (_for_display)
                 {
                     // script->previousChar();
-                    _tks.push(t);
+                    _tks->push(t);
                     nbReadToken++;
                 }
                 continue;
@@ -1903,9 +1929,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("/=");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             else if (c2 == '*')
@@ -1931,7 +1957,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                 {
-                    _tks.push(t);
+                    _tks->push(t);
                     nbReadToken++;
                 }
                 continue;
@@ -1946,7 +1972,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("/");
                 t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -1964,9 +1990,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("--");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             if (c2 == '=')
@@ -1979,9 +2005,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("-=");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             else
@@ -1995,8 +2021,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("-");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 // nbReadToken++;
                 continue;
             }
@@ -2023,7 +2049,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             // t.addText(" ";
             if (_for_display)
             {
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
             }
             continue;
@@ -2071,7 +2097,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             v += c;
             t.type = (int)TokenString;
             t.addText(v);
-            _tks.push(t);
+            _tks->push(t);
             nbReadToken++;
             continue;
         }
@@ -2087,7 +2113,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 _token_line++;
             pos = 0;
             if (_for_display)
-                _tks.push(t);
+                _tks->push(t);
                 #ifdef PARSER_DEBUG
             if (!_for_display)
             {
@@ -2108,7 +2134,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //_token_line++;
             //  pos = 0;
             // if (_for_display)
-            _tks.push(t);
+            _tks->push(t);
             continue;
         }
         if (c == '.')
@@ -2122,7 +2148,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //_token_line++;
             //  pos = 0;
             // if (_for_display)
-            _tks.push(t);
+            _tks->push(t);
             // nbReadToken++;
             continue;
         }
@@ -2137,7 +2163,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //_token_line++;
             //  pos = 0;
             // if (_for_display)
-            _tks.push(t);
+            _tks->push(t);
             // nbReadToken++;
             continue;
         }
@@ -2149,7 +2175,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText("@");
             _token_line = _sav_token_line;
             if (_for_display)
-                _tks.push(t);
+                _tks->push(t);
             continue;
         }
         if (c == '\'')
@@ -2163,7 +2189,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //  _token_line++;
             //  pos = 0;
             if (_for_display)
-                _tks.push(t);
+                _tks->push(t);
             continue;
         }
         if (c == ':')
@@ -2177,7 +2203,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
             //_token_line++;
             //  pos = 0;
             // if (_for_display)
-            _tks.push(t);
+            _tks->push(t);
             continue;
         }
         if (c == '*')
@@ -2193,9 +2219,9 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("*=");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
+                // _tks->push(t);
                 // nbReadToken++;
-                _tks.push(t);
+                _tks->push(t);
                 continue;
             }
             else
@@ -2209,8 +2235,8 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("*");
                 // t.line = _token_line;
                 t.pos = pos;
-                // _tks.push(t);
-                _tks.push(t);
+                // _tks->push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -2228,7 +2254,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                     t.addText("||");
                 t.line = _token_line;
                 t.pos = pos;
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
 
                 continue;
@@ -2244,7 +2270,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.pos = pos;
                 if (_for_display)
                     t.addText("|");
-                _tks.push(t);
+                _tks->push(t);
                 nbReadToken++;
                 continue;
             }
@@ -2258,7 +2284,7 @@ int tokenizer(Script *script, bool update, bool increae_line,
                 t.addText(",");
             t.line = _token_line;
             t.pos = pos;
-            _tks.push(t);
+            _tks->push(t);
             // nbReadToken++;
             continue;
         }
@@ -2273,11 +2299,11 @@ int tokenizer(Script *script, bool update, bool increae_line,
 
     if (script->currentChar() == EOF_TEXT)
     {
-        if (_tks.back().getType() != TokenEndOfFile)
+        if (_tks->back().getType() != TokenEndOfFile)
         {
             t = Token(TokenEndOfFile, EOF_VARTYPE, _token_line);
 
-            _tks.push(t);
+            _tks->push(t);
         }
     }
     // return list_of_token;
